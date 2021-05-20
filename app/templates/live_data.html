@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+
+{% block app_content %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js" integrity="sha512-qTXRIMyZIFb8iQcfjXWCO8+M5Tbc38Qi5WzdPOYZHIlZpzBHG3L3by84BBBOiRGiEb7KKtAOAs5qYdUiZiQNNQ==" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.2.1/dist/chart.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/luxon@1.27.0/build/global/luxon.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@0.2.1"></script>
+<script src="{{url_for('static', filename='chartjs-plugin-streaming.js')}}"></script>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-6">
+            <div>
+                <span style="text-align: center;">Altitude</span>
+            </div>
+            <div id="alt-data">
+                1000m
+            </div>
+        </div>
+    </div>
+	<div class="row">
+		<div class="col-md-12">
+			<div class="row">
+				<div class="col-md-6">
+                    <canvas id='velocity-graph'></canvas>
+				</div>
+				<div class="col-md-6">
+                    <canvas id='accel-graph'></canvas>
+				</div>
+				<div class="col-md-4">
+				</div>
+			</div>
+            <div class="row">
+				<div class="col-md-6">
+                    <canvas id='spr-graph'></canvas>
+				</div>
+				<div class="col-md-6">
+                    <canvas id='dpr-graph'></canvas>
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-4">
+				</div>
+				<div class="col-md-4">
+				</div>
+				<div class="col-md-4">
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script type="text/javascript">
+
+    /*$(document).ready(function(){
+        var _data;
+        var _labels;
+        $.ajax({
+            url: "/streaming",
+            type: "get",
+            dataType: "json",
+            success: function(graph_data){
+                if(graph_data.name == 'vel'){
+                    velocityChart.data.datasets.forEach(function(dataset){
+                        dataset.data.push({
+                            x: Date.now(),
+                            y: graph_data.value
+                        });
+                });
+                }
+
+                if(graph_data.name == 'acc'){
+                    accelChart.data.datasets.forEach(function(dataset){
+                        dataset.data.push({
+                            x: Date.now(),
+                            y: graph_data.value
+                        });
+                    });
+                }
+
+                if(graph_data.name == 'alt'){
+                    altCtx.innerHTML = formatNumber(graph_data.value.toFixed(2)) + " m"
+                }
+            }
+        })
+    });
+    */
+    var chartColors = {
+			red: 'rgb(255, 99, 132)',
+			orange: 'rgb(255, 159, 64)',
+			yellow: 'rgb(255, 205, 86)',
+			green: 'rgb(75, 192, 192)',
+			blue: 'rgb(54, 162, 235)',
+			purple: 'rgb(153, 102, 255)',
+			grey: 'rgb(201, 203, 207)'
+	};
+    var velCtx = document.getElementById('velocity-graph').getContext('2d');
+    var accelCtx = document.getElementById('accel-graph').getContext('2d');
+    var sprCtx = document.getElementById('spr-graph').getContext('2d');
+    var dprCtx = document.getElementById('dpr-graph').getContext('2d');
+    var altCtx = document.getElementById('alt-data');
+
+    var velocityChart = new Chart(velCtx, {
+    type: 'line',
+    data: {
+        datasets: [{
+            label: 'Velocity',
+            data: [],
+            backgroundColor: chartColors.red,
+            borderColor: chartColors.red,
+            fill: true
+        }]
+    },
+    options: {
+        scales: {
+            x: {
+                type: 'realtime'
+            }
+        }
+    }
+    });
+
+    var accelChart = new Chart(accelCtx, {
+    type: 'line',
+    data: {
+        datasets: [{
+            label: 'Acceleration',
+            data: [],
+            backgroundColor: chartColors.blue,
+            borderColor: chartColors.blue,
+            fill: true
+        }]
+    },
+    options: {
+        scales: {
+            x: {
+                type: 'realtime'
+            }
+        }
+    }
+    });
+
+    var sprChart = new Chart(sprCtx, {
+    type: 'line',
+    data: {
+        datasets: [{
+            label: 'Static Pressure',
+            data: [],
+            backgroundColor: chartColors.red,
+            borderColor: chartColors.red,
+            fill: true
+        }]
+    },
+    options: {
+        scales: {
+            x: {
+                type: 'realtime'
+            }
+        }
+    }
+    });
+
+    var dprChart = new Chart(dprCtx, {
+    type: 'line',
+    data: {
+        datasets: [{
+            label: 'Dynamic Pressure',
+            data: [],
+            backgroundColor: chartColors.blue,
+            borderColor: chartColors.blue,
+            fill: true
+        }]
+    },
+    options: {
+        scales: {
+            x: {
+                type: 'realtime'
+            }
+        }
+    }
+    });
+
+
+    var source = new EventSource('/streaming');
+    source.onmessage = function(event){
+        data = event.data;
+        var graph_data = JSON.parse(data)
+
+        if(graph_data.name == 'vel'){
+            velocityChart.data.datasets.forEach(function(dataset){
+                console.log(graph_data.value)
+                try{
+                    dataset.data.push({
+                        x: Date.now(),
+                        y: graph_data.value
+                    });
+                }catch(err){
+                    console.log(err)
+                }
+           });
+        }
+
+        if(graph_data.name == 'acc'){
+            accelChart.data.datasets.forEach(function(dataset){                
+                try{
+                    dataset.data.push({
+                        x: Date.now(),
+                        y: graph_data.value
+                    });
+                }
+                catch(err){
+                    console.log(err)
+                }
+            });
+        }
+
+        if(graph_data.name == 'spr'){
+            sprChart.data.datasets.forEach(function(dataset){                
+                try{
+                    dataset.data.push({
+                        x: Date.now(),
+                        y: graph_data.value
+                    });
+                }
+                catch(err){
+                    console.log(err)
+                }
+            });
+        }
+
+        if(graph_data.name == 'dpr'){
+            dprChart.data.datasets.forEach(function(dataset){                
+                try{
+                    dataset.data.push({
+                        x: Date.now(),
+                        y: graph_data.value
+                    });
+                }
+                catch(err){
+                    console.log(err)
+                }
+            });
+        }
+
+        if(graph_data.name == 'alt'){
+            altCtx.innerHTML = graph_data.value + " m"
+        }
+    };
+
+    function formatNumber(num) {
+         return num.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,')
+    }
+
+
+</script>
+
+{% endblock %}
